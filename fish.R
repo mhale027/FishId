@@ -97,6 +97,75 @@ for (i in 1:nrow(files)) {
 
 
 
+dims <- data.frame(rows = 0, cols = 0, depth = 0, channels = 0)
+for (i in 1:length(list.files("fish.processed"))) {
+      
+      dims[i,] <- dim(load.image(paste("fish.processed", list.files("fish.processed")[i], sep = "/")))
+}
+
+save(dims, file = "dims.RData")
+
+
+
+data <- list()
+
+for (i in 1:length(list.files("alldata"))) {
+      
+      img.i <- load.image(paste("alldata", list.files("alldata")[i], sep = "/"))
+      img.r <- matrix(img.i, ncol = 45000)
+      data[[i]] <- img.r
+      
+}
+
+alldata <- data[[1]]
+
+foreach(i = 2:length(list.files("alldata")), .combine = rbind) %dopar% {
+      
+      alldata <- rbind(alldata, matrix(data[[i]], ncol = 45000))
+
+}
+
+
+
+for (i in 1:nrow(files)) {
+      file <- files$image[i]
+      img.i <- load.image(paste(folder, files[i,1], files[i,2], sep = "/"))
+      img.r <- resize(img.i, 300, 150, 1, 3)
+      save.image(img.r, file = paste0("alldata/", files[i,1], ".", files[i,2]))
+}
+
+
+
+
+
+
+
+
+classes <- factor(files$label)
+labels <- as.numeric(classes)
+
+
+
+isfish <- c(rep(1, length(list.files("fish.processed"))))
+isfish[grep("empty", list.files("fish.processed"))] <- 0
+
+
+xgb.params <- list(
+      eta = .1,
+      objective = "binary:logistic",
+      max_depth = 5,
+      colsample_bytree = .5,
+      subsample = .5
+)
+ytrain <- isfish
+xtrain <- xgb.DMatrix(data.matrix(alldata[,-1]), label = ytrain)
+
+bst <- xgboost(data = xtrain,
+               params = xgb.params,
+               nrounds = 50
+)
+
+
 
 
 
