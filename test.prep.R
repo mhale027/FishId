@@ -19,28 +19,29 @@ for (i in 1:length(tests)) {
       save.image(img.r, file = paste0("test.prep/", tests[i]))
 }
 
-xtest <- matrix(ncol = 45000)
-xtest <- matrix(resize(load.image(paste(folder, list.files(folder)[1], sep = "/")), 300,150,1,1), ncol = 45000)
-count <- 1
+count <- 0
 alldata <- matrix(ncol = 45000)
-for (i in 1:50) {
+folder <- "input/test_stg1"
+for (i in 1:20) {
       print(i)
-      for (j in 1:20) {
+      for (j in 1:50) {
             count <- count + 1
             print(count)
             img.r <- load.image(paste(folder, list.files(folder)[count], sep = "/"))
             img.mat <- matrix(resize(img.r, 300, 150, 1, 1), ncol = 45000)
             if (j == 1) {
                   alldata <- img.mat
-            } else if (i == 50 & j == 20) {
-                  next
             } else {
                   alldata <- rbind(alldata, img.mat)
             }
       }
-      
-      xtest <- rbind(xtest, alldata)
+      if (i == 1) {
+            alltest <- alldata
+      } else {
+            alltest <- rbind(alltest, alldata)
+      }
 }
 
+save(alltest, file = "alltest.300x150.RData")
 
 
