@@ -18,6 +18,14 @@ tmp <- lapply(list.files(folder), function(x) list.files(paste0(folder, '/', x))
 files <- data.frame(label = rep(list.files(folder), sapply(tmp, length)), image = unlist(tmp))
 fish.files <- filter(files, label != "NoF")
 
+
+
+
+
+
+
+
+
 folder <- 'input/test_stg1'
 tests <- list.files(folder)
 
@@ -92,6 +100,33 @@ markers <- data.frame(fread("markers.csv"))
 
 
 
+grads <- data.frame(matrix(rep(0, 45000),ncol = 45000))
+names(grads) <- paste("pixel_", 1:45000)
+
+
+
+for (i in 1:nrow(files)) {
+      print(i)
+      im <- load.image(paste("input/train", files$label[i], files$image[i], sep = "/"))
+      im <- imgradient(resize(im, 300, 150, 1, 1), "xy")
+      im <- sqrt((im$x^2) + (im$y^2))
+      save.image(im, paste0("gradients/", files$label[i], "_", files$image[i]))
+      grads[i,] <- matrix(im, nrow = 1)
+}
+save(grads, file = "grads.wide.RData")
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 isfish <- c(rep(1, length(list.files("alldata"))))
@@ -148,13 +183,13 @@ allmarked <- cbind(marks, allmarked)
 
 
 
-load("allmarked.df.RData")
+load("allmarked.RData")
 inTrain <- createDataPartition(1:nrow(allmarked), p=.7, list = FALSE)
 inValid <- (1:nrow(allmarked))[-inTrain]
 
 
 
-h2o.init(nthreads = 8, max_mem_size = "10240")
+h2o.init(nthreads = 8)
 h2o.removeAll()
 
 
@@ -218,8 +253,8 @@ h2o.shutdown()
 xgb.grid <- expand.grid(
       nrounds = 2, 
       eta = 0.05, 
-      max_depth = seq(4,20, 1), 
-      gamma = c(0), 
+      max_depth = seq(10,18, 1), 
+      gamma = c(0,1,2,5), 
       colsample_bytree = c(0.2, 0.3), 
       min_child_weight = c(1)
 )
@@ -256,122 +291,163 @@ xgb.prep <- train(x=data.matrix(allmarked[1:100,-c(1:5)]),
 
 
 
-
-
-xtrain <- xgb.DMatrix(data.matrix(allmarked[inTrain,-c(1:5)]), label = box$head_x[inTrain])
-gc()
-xvalid <- xgb.DMatrix(data.matrix(allmarked[inValid,-c(1:5)]), label = box$head_x[inValid])
-gc()
-
-
-
-xg_eval_mae <- function (yhat, dtrain) {
-      y = getinfo(dtrain, "label")
-      err= mae(y, yhat)
-      return (list(metric = "error", value = err))
-}
-
-
-xgb.params.head_x <- list(
-      eta = .1,
+xgb.params <- list(
+      eta = .03,
       objective = "reg:linear",
-      max_depth = 12,
-      colsample_bytree = .5,
-      subsample = .4,
-      base_score = 122
+      max_depth = 13,
+      colsample_bytree = .2,
+      subsample = .4
       # feval = xg_eval_mae
 )
 
 
-xgb.head_x <- xgb.train(data = xtrain, 
-                        watchlist = list(train = xtrain, valid = xvalid),
+train1 <- 1:1656
+train2 <- 1657:3312
+
+
+xtrain1 <- xgb.DMatrix(data.matrix(allmarked[train1,-c(1:5)]), label = box$head_x[train1])
+gc()
+xtrain2 <- xgb.DMatrix(data.matrix(allmarked[train2,-c(1:5)]), label = box$head_x[train2])
+gc()
+xgb.params <- list(
+      eta = .03,
+      objective = "reg:linear",
+      max_depth = 13,
+      colsample_bytree = .2,
+      subsample = .4,
+      base_score = 122
+)
+xgb.head_x.1 <- xgb.train(data = xtrain1, 
+                        watchlist = list(train = xtrain1, valid = xtrain2),
                         nrounds = 500,
                         early_stopping_rounds = 10,
-                        params = xgb.params.head_x,
+                        params = xgb.params,
                         maximize = FALSE,
                         print_every_n = 20
 )
-
+gc()
+xgb.head_x.2 <- xgb.train(data = xtrain2, 
+                          watchlist = list(train = xtrain2, valid = xtrain1),
+                          nrounds = 500,
+                          early_stopping_rounds = 10,
+                          params = xgb.params,
+                          maximize = FALSE,
+                          print_every_n = 20
+)
 gc()
 
-xtrain <- xgb.DMatrix(data.matrix(allmarked[inTrain,-c(1:5)]), label = as.integer(box$tail_x[inTrain]))
+
+
+
+
+
+
+
+
+xtrain1 <- xgb.DMatrix(data.matrix(allmarked[train1,-c(1:5)]), label = as.integer(box$tail_x[train1]))
 gc()
-xvalid <- xgb.DMatrix(data.matrix(allmarked[inValid,-c(1:5)]), label = as.integer(box$tail_x[inValid]))
+xtrain2 <- xgb.DMatrix(data.matrix(allmarked[train2,-c(1:5)]), label = as.integer(box$tail_x[train2]))
 gc()
-xgb.params.tail_x <- list(
-      eta = .1,
+xgb.params <- list(
+      eta = .03,
       objective = "reg:linear",
-      max_depth = 12,
-      colsample_bytree = .5,
+      max_depth = 13,
+      colsample_bytree = .2,
       subsample = .4,
       base_score = 156
 )
-
-
-xgb.tail_x <- xgb.train(data = xtrain, 
-                        watchlist = list(train = xtrain, valid = xvalid),
+xgb.tail_x.1 <- xgb.train(data = xtrain1, 
+                        watchlist = list(train = xtrain1, valid = xtrain2),
                         nrounds = 500,
                         early_stopping_rounds = 10,
-                        params = xgb.params.tail_x,
+                        params = xgb.params,
+                        print_every_n = 20
+)
+gc()
+xgb.tail_x.2 <- xgb.train(data = xtrain2, 
+                        watchlist = list(train = xtrain2, valid = xtrain1),
+                        nrounds = 500,
+                        early_stopping_rounds = 10,
+                        params = xgb.params,
                         print_every_n = 20
 )
 gc()
 
-xtrain <- xgb.DMatrix(data.matrix(allmarked[inTrain,-c(1:5)]), label = box$head_y[inTrain])
+
+
+
+
+xtrain1 <- xgb.DMatrix(data.matrix(allmarked[train1,-c(1:5)]), label = box$head_y[train1])
 gc()
-xvalid <- xgb.DMatrix(data.matrix(allmarked[inValid,-c(1:5)]), label = box$head_y[inValid])
+xtrain2 <- xgb.DMatrix(data.matrix(allmarked[train2,-c(1:5)]), label = box$head_y[train2])
 gc()
-xgb.params.head_y <- list(
-      eta = .1,
+xgb.params <- list(
+      eta = .03,
       objective = "reg:linear",
-      max_depth = 12,
-      colsample_bytree = .5,
+      max_depth = 13,
+      colsample_bytree = .2,
       subsample = .4,
       base_score = 75
 )
-
-
-xgb.head_y <- xgb.train(data = xtrain, 
-                        watchlist = list(train = xtrain, valid = xvalid),
+xgb.head_y.1 <- xgb.train(data = xtrain1, 
+                        watchlist = list(train = xtrain1, valid = xtrain2),
                         nrounds = 500,
                         early_stopping_rounds = 10,
-                        params = xgb.params.head_y,
+                        params = xgb.params,
                         print_every_n = 20
 )
-
+gc()
+xgb.head_y.2 <- xgb.train(data = xtrain2, 
+                        watchlist = list(train = xtrain2, valid = xtrain1),
+                        nrounds = 500,
+                        early_stopping_rounds = 10,
+                        params = xgb.params,
+                        print_every_n = 20
+)
 gc()
 
-xtrain <- xgb.DMatrix(data.matrix(allmarked[inTrain,-c(1:5)]), label = box$tail_y[inTrain])
+
+
+
+xtrain1 <- xgb.DMatrix(data.matrix(allmarked[train1,-c(1:5)]), label = box$tail_y[train1])
 gc()
-xvalid <- xgb.DMatrix(data.matrix(allmarked[inValid,-c(1:5)]), label = box$tail_y[inValid])
+xtrain2 <- xgb.DMatrix(data.matrix(allmarked[train2,-c(1:5)]), label = box$tail_y[train2])
 gc()
-xgb.params.tail_y <- list(
-      eta = .1,
+xgb.params <- list(
+      eta = .03,
       objective = "reg:linear",
-      max_depth = 12,
-      colsample_bytree = .5,
+      max_depth = 13,
+      colsample_bytree = .2,
       subsample = .4,
       base_score = 78
 )
-
-
-xgb.tail_y <- xgb.train(data = xtrain, 
-                        watchlist = list(train = xtrain, valid = xvalid),
+xgb.tail_y.1 <- xgb.train(data = xtrain1, 
+                        watchlist = list(train = xtrain1, valid = xtrain2),
                         nrounds = 500,
                         early_stopping_rounds = 10,
-                        params = xgb.params.tail_y,
+                        params = xgb.params,
                         print_every_n = 10
 )
 gc()
-save(xgb.head_x, xgb.tail_x, xgb.head_y, xgb.tail_y, file = "xgb.marks.set.RData")
+xgb.tail_y.2 <- xgb.train(data = xtrain2, 
+                        watchlist = list(train = xtrain2, valid = xtrain1),
+                        nrounds = 500,
+                        early_stopping_rounds = 10,
+                        params = xgb.params,
+                        print_every_n = 10
+)
 gc()
-xtrain <- xgb.DMatrix(data.matrix(allmarked))
 
-pred.train <- data.frame(image = marks$image,
-                         head_x = predict(xgb.head_x, xtrain), 
-                         head_y = predict(xgb.head_y, xtrain),
-                         tail_x = predict(xgb.tail_x, xtrain),
-                         tail_y = predict(xgb.tail_y, xtrain)
+
+# save(xgb.head_x, xgb.tail_x, xgb.head_y, xgb.tail_y, file = "xgb.marks.set.RData")
+# gc()
+# xtrain <- xgb.DMatrix(data.matrix(allmarked))
+
+pred.train <- data.frame(image = allmarked$image,
+                         head_x = c(predict(xgb.head_x.2, xtrain1), predict(xgb.head_x.1, xtrain2)),
+                         head_y = c(predict(xgb.head_y.2, xtrain1), predict(xgb.head_x.1, xtrain2)),
+                         tail_x = c(predict(xgb.tail_x.2, xtrain1), predict(xgb.head_x.1, xtrain2)),
+                         tail_y = c(predict(xgb.tail_y.2, xtrain1), predict(xgb.head_x.1, xtrain2))
 )
 gc()
 
@@ -435,49 +511,51 @@ xgb.prep.l2 <- train(x=data.matrix(allmarked.l2[1:100,-c(1)]),
 
 
 
-xtrain <- xgb.DMatrix(data.matrix(allmarked.l2[inTrain,-c(1)]), label = box$head_x[inTrain])
+xtrain1 <- xgb.DMatrix(data.matrix(allmarked.l2[train1,-c(1)]), label = box$head_x[train1])
 gc()
-xvalid <- xgb.DMatrix(data.matrix(allmarked.l2[inValid,-c(1)]), label = box$head_x[inValid])
+xtrain2 <- xgb.DMatrix(data.matrix(allmarked.l2[train2,-c(1)]), label = box$head_x[train2])
 gc()
 
 
-
-xg_eval_mae <- function (yhat, dtrain) {
-      y = getinfo(dtrain, "label")
-      err= mae(y, yhat)
-      return (list(metric = "error", value = err))
-}
-
-
-xgb.params.head_x <- list(
-      eta = .01,
+xgb.params.l2 <- list(
+      eta = .05,
       objective = "reg:linear",
       max_depth = 16,
       colsample_bytree = .2,
       gamma = 2,
       subsample = .4,
-      base_score = 122 
-      # feval = xg_eval_mae
+      base_score = 122
 )
-
-
-xgb.head_x.l2 <- xgb.train(data = xtrain, 
-                        watchlist = list(train = xtrain, valid = xvalid),
-                        nrounds = 500,
-                        early_stopping_rounds = 10,
-                        params = xgb.params.head_x,
-                        maximize = FALSE,
-                        print_every_n = 20
+xgb.head_x.l2.1 <- xgb.train(data = xtrain1, 
+                           watchlist = list(train = xtrain1, valid = xtrain2),
+                           nrounds = 500,
+                           early_stopping_rounds = 10,
+                           params = xgb.params.l2,
+                           maximize = FALSE,
+                           print_every_n = 20
 )
-
+gc()
+xgb.head_x.l2.2 <- xgb.train(data = xtrain2, 
+                               watchlist = list(train = xtrain2, valid = xtrain1),
+                               nrounds = 500,
+                               early_stopping_rounds = 10,
+                               params = xgb.params.l2,
+                               maximize = FALSE,
+                               print_every_n = 20
+)
 gc()
 
-xtrain <- xgb.DMatrix(data.matrix(allmarked.l2[inTrain,-c(1)]), label = box$tail_x[inTrain])
+
+
+
+
+
+xtrain1 <- xgb.DMatrix(data.matrix(allmarked.l2[train1,-c(1)]), label = box$tail_x[train1])
 gc()
-xvalid <- xgb.DMatrix(data.matrix(allmarked.l2[inValid,-c(1)]), label = box$tail_x[inValid])
+xtrain2 <- xgb.DMatrix(data.matrix(allmarked.l2[train2,-c(1)]), label = box$tail_x[train2])
 gc()
-xgb.params.tail_x <- list(
-      eta = .01,
+xgb.params.l2 <- list(
+      eta = .05,
       objective = "reg:linear",
       max_depth = 16,
       colsample_bytree = .2,
@@ -485,23 +563,32 @@ xgb.params.tail_x <- list(
       subsample = .4,
       base_score = 156
 )
-
-
-xgb.tail_x.l2 <- xgb.train(data = xtrain, 
-                        watchlist = list(train = xtrain, valid = xvalid),
+xgb.tail_x.l2.1 <- xgb.train(data = xtrain1, 
+                        watchlist = list(train = xtrain1, valid = xtrain2),
                         nrounds = 500,
                         early_stopping_rounds = 10,
-                        params = xgb.params.tail_x,
+                        params = xgb.params.l2,
                         print_every_n = 20
 )
 gc()
+xgb.tail_x.l2.2 <- xgb.train(data = xtrain2, 
+                           watchlist = list(train = xtrain2, valid = xtrain1),
+                           nrounds = 500,
+                           early_stopping_rounds = 10,
+                           params = xgb.params.l2,
+                           print_every_n = 20
+)
+gc()
 
-xtrain <- xgb.DMatrix(data.matrix(allmarked.l2[inTrain,-c(1)]), label = box$head_y[inTrain])
+
+
+
+xtrain1 <- xgb.DMatrix(data.matrix(allmarked.l2[train1,-c(1)]), label = box$head_y[train1])
 gc()
-xvalid <- xgb.DMatrix(data.matrix(allmarked.l2[inValid,-c(1)]), label = box$head_y[inValid])
+xtrain2 <- xgb.DMatrix(data.matrix(allmarked.l2[train2,-c(1)]), label = box$head_y[train2])
 gc()
-xgb.params.head_y <- list(
-      eta = .01,
+xgb.params.l2 <- list(
+      eta = .05,
       objective = "reg:linear",
       max_depth = 16,
       colsample_bytree = .2,
@@ -509,24 +596,32 @@ xgb.params.head_y <- list(
       subsample = .4,
       base_score = 75
 )
-
-
-xgb.head_y.l2 <- xgb.train(data = xtrain, 
-                        watchlist = list(train = xtrain, valid = xvalid),
+xgb.head_y.l2.1 <- xgb.train(data = xtrain1, 
+                        watchlist = list(train = xtrain1, valid = xtrain2),
                         nrounds = 500,
                         early_stopping_rounds = 10,
-                        params = xgb.params.head_y,
+                        params = xgb.params.l2,
                         print_every_n = 20
 )
-
+gc()
+xgb.head_y.l2.2 <- xgb.train(data = xtrain2, 
+                           watchlist = list(train = xtrain2, valid = xtrain1),
+                           nrounds = 500,
+                           early_stopping_rounds = 10,
+                           params = xgb.params.l2,
+                           print_every_n = 20
+)
 gc()
 
-xtrain <- xgb.DMatrix(data.matrix(allmarked.l2[inTrain,-c(1)]), label = box$tail_y[inTrain])
+
+
+
+xtrain1 <- xgb.DMatrix(data.matrix(allmarked.l2[train1,-c(1)]), label = box$tail_y[train1])
 gc()
-xvalid <- xgb.DMatrix(data.matrix(allmarked.l2[inValid,-c(1)]), label = box$tail_y[inValid])
+xtrain2 <- xgb.DMatrix(data.matrix(allmarked.l2[train2,-c(1)]), label = box$tail_y[train2])
 gc()
-xgb.params.tail_y <- list(
-      eta = .01,
+xgb.params.l2 <- list(
+      eta = .05,
       objective = "reg:linear",
       max_depth = 16,
       colsample_bytree = .2,
@@ -534,27 +629,114 @@ xgb.params.tail_y <- list(
       subsample = .4,
       base_score = 78
 )
-
-
-xgb.tail_y.l2 <- xgb.train(data = xtrain, 
-                        watchlist = list(train = xtrain, valid = xvalid),
+xgb.tail_y.l2.1 <- xgb.train(data = xtrain1, 
+                        watchlist = list(train = xtrain1, valid = xtrain2),
                         nrounds = 500,
                         early_stopping_rounds = 10,
-                        params = xgb.params.tail_y,
+                        params = xgb.params.l2,
                         print_every_n = 20
 )
 gc()
-save(xgb.head_x.l2, xgb.tail_x.l2, xgb.head_y.l2, xgb.tail_y.l2, file = "xgb.marks.l2.set.RData")
-gc()
-xtrain <- xgb.DMatrix(data.matrix(allmarked))
 
-pred.train.l2 <- data.frame(image = marks$image,
-                         head_x = predict(xgb.head_x.l2, xtrain), 
-                         head_y = predict(xgb.head_y.l2, xtrain),
-                         tail_x = predict(xgb.tail_x.l2, xtrain),
-                         tail_y = predict(xgb.tail_y.l2, xtrain)
+xgb.tail_y.l2.2 <- xgb.train(data = xtrain2, 
+                           watchlist = list(train = xtrain2, valid = xtrain1),
+                           nrounds = 500,
+                           early_stopping_rounds = 10,
+                           params = xgb.params.l2,
+                           print_every_n = 20
 )
 gc()
+
+
+save(xgb.head_x.l2, xgb.tail_x.l2, xgb.head_y.l2, xgb.tail_y.l2, file = "xgb.marks.l2.set.RData")
+gc()
+
+
+xtrain <- xgb.DMatrix(data.matrix(allmarked))
+
+pred.train.l2 <- data.frame(image = allmarked.l2$image,
+                         head_x = c(predict(xgb.head_x.l2.2, xtrain1), predict(xgb.head_x.l2.1, xtrain2)),
+                         head_y = c(predict(xgb.head_y.l2.2, xtrain1), predict(xgb.head_x.l2.1, xtrain2)),
+                         tail_x = c(predict(xgb.tail_x.l2.2, xtrain1), predict(xgb.head_x.l2.1, xtrain2)),
+                         tail_y = c(predict(xgb.tail_y.l2.2, xtrain1), predict(xgb.head_x.l2.1, xtrain2))
+)
+gc()
+
+
+
+pred.train.wide <- data.frame(image = allmarked.l2$image, 
+                              head_x = as.numeric(round(pred.train$head_x * dims$rows / 300)),
+                              tail_x = as.numeric(round(pred.train$tail_x * dims$rows / 300)),
+                              head_y = as.numeric(round(pred.train$head_y * dims$cols / 150)),
+                              tail_y = as.numeric(round(pred.train$tail_y * dims$cols / 150))
+)
+
+pred.train.l2.wide <- data.frame(image = allmarked.l2$image, 
+                              head_x = as.numeric(round(pred.train.l2$head_x * dims$rows / 300)),
+                              tail_x = as.numeric(round(pred.train.l2$tail_x * dims$rows / 300)),
+                              head_y = as.numeric(round(pred.train.l2$head_y * dims$cols / 150)),
+                              tail_y = as.numeric(round(pred.train.l2$tail_y * dims$cols / 150))
+)
+
+
+
+
+
+
+########################################################################
+########################################################################
+############################## crop images #############################
+########################################################################
+
+means <- data.frame(image = allmarked.l2$image)
+means$markers_x <- (marks$head_x + marks$tail_x) / 2
+means$markers_y <- (marks$head_y + marks$tail_y) / 2
+means$pred_x <- (pred.train.wide$head_x + pred.train.wide$tail_x) / 2
+means$pred_y <- (pred.train.wide$head_y + pred.train.wide$tail_y) / 2
+means$pred.l2_x <- (pred.train.l2.wide$head_x + pred.train.l2.wide$tail_x) / 2
+means$pred.l2_y <- (pred.train.l2.wide$head_y + pred.train.l2.wide$tail_y) / 2
+means <- mutate(means, px = (pred_x + pred.l2_x)/2)
+means <- mutate(means, py = (pred_y + pred.l2_y)/2)
+
+allcut <- data.frame(matrix(rep(0, 45000), nrow = 1))
+names(allcut) <- paste0("pixel_", 1:45000)
+for (i in 1:nrow(allmarked.l2)) {
+      print(i)
+      img.i <- load.image(paste("input/train", fish.files$label[i], fish.files$image[i], sep = "/"))
+      img.i <- imsub(img.i, x > means$px[i] - 300 & x < means$px[i] + 300)
+      img.i <- imsub(img.i, y > means$py[i] - 150 & y < means$py[i] + 150)
+      save.image(img.i, file = paste0("allcut1/", fish.files$label[i], "_", fish.files$image[i]))
+      img.i <- resize(img.i, 300, 150, 1, 1)
+      allcut[i,] <- data.frame(matrix(img.i, nrow = 1))
+}
+save(allcut, "allcut1.RData")
+
+crop.markers <- box   
+deltas <- data.frame(image = allmarked.l2$image, dx = rep(0, nrow(allmarked.l2)), dy = rep(0, nrow(allmarked.l2)))
+for (i in 1:nrow(allmarked.l2)) {
+      
+      crop.markers$head_x[i] <- (marks$head_x[i] - means$px[i] + 300) / 2
+      crop.markers$tail_x[i] <- (marks$tail_x[i] - means$px[i] + 300) / 2
+      
+      crop.markers$head_y[i] <- (marks$head_y[i] - means$py[i] + 150) / 2
+      crop.markers$tail_y[i] <- (marks$tail_y[i] - means$py[i] + 150) / 2
+      
+      
+}
+      
+cropped.image <- function(id) {
+      plot(resize(load.image(paste0("allcut1/", fish.files$label[id], "_", fish.files$image[id])), 300, 150, 1 ,1))
+      points(crop.markers[id,c(2,4)], crop.markers[id,c(3,5)], col = "red", lwd = 2)
+      
+}      
+
+
+
+
+
+
+
+
 
 
 
@@ -637,6 +819,28 @@ train.image <- function(id) {
       points(pred.train.l2$head_x[id], pred.train.l2$head_y[id], col = "red", pch = 23, lwd = 10)
       points(pred.train.l2$tail_x[id], pred.train.l2$tail_y[id], col = "blue", pch = 23, lwd = 10)
 }
+
+
+
+
+test.wide <- function(id) {
+      plot(load.image(paste0("input/test_stg1/", list.files("input/test_stg1")[id])))
+      points(pred.test[id,c(2,4)], pred.test[id,c(3,5)], col = "red", lwd = 2)
+      
+}
+
+train.wide <- function(id) {
+      plot(load.image(paste0("input/train/", fish.files$label[id], "/", fish.files$image[id])))
+      points(allmarked$head_x[id], allmarked$head_y[id], col = "red", lwd = 2)
+      points(allmarked$tail_x[id], allmarked$tail_y[id], col = "blue", lwd = 2)
+      points(pred.train.wide$head_x[id], pred.train.wide$head_y[id], col = "red", pch = 19, lwd = 5)
+      points(pred.train.wide$tail_x[id], pred.train.wide$tail_y[id], col = "blue", pch = 19, lwd = 5)
+      points(pred.train.l2.wide$head_x[id], pred.train.l2.wide$head_y[id], col = "red", pch = 23, lwd = 10)
+      points(pred.train.l2.wide$tail_x[id], pred.train.l2.wide$tail_y[id], col = "blue", pch = 23, lwd = 10)
+}
+
+
+
 
 patches <- list()
 species <- list.files("input/train")[-grep("NoF", list.files("input/train"))]
