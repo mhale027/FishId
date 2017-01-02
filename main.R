@@ -113,8 +113,19 @@ for (i in 1:nrow(files)) {
       save.image(im, paste0("gradients/", files$label[i], "_", files$image[i]))
       grads[i,] <- matrix(im, nrow = 1)
 }
-save(grads, file = "grads.wide.RData")
+save(grads, file = "grads.300x150.RData")
 
+
+
+
+for (i in 1:nrow(files)) {
+      print(i)
+      im <- load.image(paste("input/train", files$label[i], files$image[i], sep = "/"))
+      im <- imgradient(grayscale(im), "xy")
+      im <- sqrt((im$x^2) + (im$y^2))
+      save.image(im, paste0("gradients.wide/", files$label[i], "_", files$image[i]))
+}
+save(grads.wide, file = "grad.wide.RData")
 
 
 
