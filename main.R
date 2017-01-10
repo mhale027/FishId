@@ -108,12 +108,12 @@ names(grads) <- paste("pixel_", 1:45000)
 for (i in 1:nrow(files)) {
       print(i)
       im <- load.image(paste("input/train", files$label[i], files$image[i], sep = "/"))
-      im <- imgradient(resize(im, 300, 150, 1, 1), "xy")
-      im <- sqrt((im$x^2) + (im$y^2))
-      save.image(im, paste0("gradients/", files$label[i], "_", files$image[i]))
+      im <- get_gradient(resize(isoblur(im, 4), 150, 75, 1, 1), "xy")
+      im <- sqrt((im[[1]]^2) + (im[[2]]^2))
+      save.image(im, paste0("gradients.150x75/", files$label[i], "_", files$image[i]))
       grads[i,] <- matrix(im, nrow = 1)
 }
-save(grads, file = "grads.300x150.RData")
+save(grads, file = "grads.150x75.RData")
 
 
 
@@ -121,11 +121,11 @@ save(grads, file = "grads.300x150.RData")
 for (i in 1:nrow(files)) {
       print(i)
       im <- load.image(paste("input/train", files$label[i], files$image[i], sep = "/"))
-      im <- imgradient(grayscale(im), "xy")
-      im <- sqrt((im$x^2) + (im$y^2))
-      save.image(im, paste0("gradients.wide/", files$label[i], "_", files$image[i]))
+      im <- get_gradient(isoblur(grayscale(im), 5), "xy")
+      im <- sqrt((im[[1]]^2) + (im[[2]]^2))
+      save.image(im, paste0("gradients.wide.blur/", files$label[i], "_", files$image[i]))
 }
-save(grads.wide, file = "grad.wide.RData")
+save(grads.wide, file = "grad.wide.blur.RData")
 
 
 
@@ -167,7 +167,7 @@ save(marks, file = "marks.RData")
 
 folder <- "input/train"
 dims <- data.frame(label = 0, image = 0 , rows = 0, cols = 0, depth = 0, channels = 0)
-for (i in 1:nrow(solomarks)) {
+for (i in 1:nrow(marks)) {
       print(i)
       dims[i,] <- c(as.character(fish.files$label[i]), as.character(fish.files$image[i]), dim(load.image(paste(folder, 
                                                                                                                fish.files$label[i],
@@ -228,7 +228,7 @@ features <- 6:45005
 
 response <- 2
 
-system.time(dnn.2<-h2o.deeplearning(x = features,
+system.time(dnn<-h2o.deeplearning(x = features,
                         y =response,
                         training_frame=train.hex,
                         validation_frame=valid.hex,
@@ -745,10 +745,49 @@ cropped.image <- function(id) {
 
 
 
+deg <- function(rad) 180*rad/pi
 
 
 
 
+for (i in 1:nrow(markers)) {
+      img <- load.image(paste0("train/", markers$image[i]))
+      x.center <- mean(markers[i,2], markers[i,4])
+      y.center <- mean(markers[i,3], markers[i,5])
+      dx <- markers[i,2] - markers[i,4]
+      dy <- markers[i,3] - markers[i,5]
+      d <- max(abs(dx), abs(dy))/2
+      
+      img1 <- imsub(img, x > min(markers[i,2], markers[i,4]), x < max(markers[i,2], markers[i,4]))
+      img1 <- imsub(img1, y > min(markers[i,3], markers[i,5]), y < max(markers[i,3], markers[i,5]))
+      img1 <- imrotate(img1, -atan(dy/dx)*180/pi)
+      save.image(img1, paste0("cv/pos/", i, ".jpg"))
+}
+
+
+for (i in 1:nrow(markers)) {
+      img <- load.image(paste0("train/", markers$image[i]))
+      x.center <- (markers[i,2] + markers[i,4])/2
+      y.center <- (markers[i,3] + markers[i,5])/2
+      dx <- markers[i,2] - markers[i,4]
+      dy <- markers[i,3] - markers[i,5]
+      d <- max(abs(dx), abs(dy))/2
+
+      img1 <- imsub(img, x > (x.center - d - 50) & x < (x.center + d + 50))
+      img1 <- imsub(img1, y > (y.center - d - 50) & y < (y.center + d + 50))
+      img1 <- imrotate(img1, -atan(dy/dx)*180/pi)
+      if (dx > 0) { img1 <- mirror(img1, "x") }
+      img2 <- imsub(img1, x > (dim(img1)[1]/2 - d) & x < (dim(img1)[1]/2 + d))
+      img2 <- imsub(img2, y > (dim(img1)[2]/2 - d) & y < (dim(img1)[2]/2 + d))
+      save.image(img1, paste0("cv/pos/", i, ".jpg"))
+}
+
+for (i in 1:nrow(markers)) {
+      img <- resize(load.image(paste0("cv/pos40x40/", i, ".jpg")), 60, 50, 1, 1)
+      img1 <- imsub(img, x > 5 & x < 55)
+      img2 <- imsub(img1, y > 10 & y < 40)
+      save.image(img2, paste0("cv/pos50x30/", i, ".jpg"))
+}
 
 
 
