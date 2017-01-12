@@ -6,12 +6,15 @@ import datetime
 import time
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import cv2
 
 
-os.chdir("C:/users/pc/documents/Projects/kaggle/FishId")
+os.chdir("projects/kaggle/FishId")
 
 folder = "input/train"
-species = os.listdir(folder)
+species = ['ALB', 'BET', 'DOL', 'LAG', 'NoF', 'OTHER', 'SHARK', 'YFT']
+
+
 
 files = pd.DataFrame(columns = ['label', 'image'])
 
@@ -29,7 +32,7 @@ fish_files = files[files['label'] != "NoF"]
 
 markers = pd.DataFrame.from_csv("markers.csv")
 
-
+img = cv2.imread("input/train/"+str(files['label'][1])+str(files['image'][1]))
 
 
 
