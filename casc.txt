@@ -1,11 +1,35 @@
 cd outputs
 
-find pos -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > pos.txt
+find posALB -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > posALB.txt
+find posBET -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > posBET.txt
+find posDOL -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > posDOL.txt
+find posLAG -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > posLAG.txt
+find posOTHER -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > posOTHER.txt
+find posSHARK -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > posSHARK.txt
+find posYFT -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > posYFT.txt
 
 find neg -name '*.jpg' > bg.txt
 
-opencv_createsamples -info pos.txt -bg bg.txt -vec info.vec -num 4305 -maxxangle 1 -maxyangle -maxzangle 1 -w 75 -h 50
+opencv_createsamples -info posALB.txt -bg bg.txt -vec infoALB.vec -num 2474 -w 36 -h 24
+opencv_createsamples -info posBET.txt -bg bg.txt -vec infoBET.vec -num 297 -w 36 -h 24
+opencv_createsamples -info posDOL.txt -bg bg.txt -vec infoDOL.vec -num 127 -w 36 -h 24
+opencv_createsamples -info posLAG.txt -bg bg.txt -vec infoLAG.vec -num 98 -w 36 -h 24
+opencv_createsamples -info posOTHER.txt -bg bg.txt -vec infoOTHER.vec -num 317 -w 36 -h 24
+opencv_createsamples -info posSHARK.txt -bg bg.txt -vec infoSHARK.vec -num 193 -w 36 -h 24
+opencv_createsamples -info posYFT.txt -bg bg.txt -vec infoYFT.vec -num 799 -w 36 -h 24
 
-opencv_traincascade -data cascades -vec info.vec -bg bg.txt -numStages 15 -minHitRate 0.999 -maxFalseAlarmRate 0.5 -numPos 4000 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 75 -h 50
+opencv_traincascade -data cascades/ALB -vec infoALB.vec -bg bg.txt -numStages 30 -minHitRate 0.999 -maxFalseAlarmRate 0.2 -numPos 2474 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 36 -h 24
+
+opencv_traincascade -data cascades/BET -vec infoBET.vec -bg bg.txt -numStages 12 -minHitRate 0.999 -maxFalseAlarmRate 0.2 -numPos 297 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 36 -h 24
+
+opencv_traincascade -data cascades/DOL -vec infoDOL.vec -bg bg.txt -numStages 10 -minHitRate 0.999 -maxFalseAlarmRate 0.2 -numPos 127 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 36 -h 24
+
+opencv_traincascade -data cascades/LAG -vec infoLAG.vec -bg bg.txt -numStages 10 -minHitRate 0.999 -maxFalseAlarmRate 0.2 -numPos 98 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 36 -h 24
+
+opencv_traincascade -data cascades/OTHER -vec infoOTHER.vec -bg bg.txt -numStages 12 -minHitRate 0.999 -maxFalseAlarmRate 0.2 -numPos 317 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 36 -h 24
+
+opencv_traincascade -data cascades/SHARK -vec infoSHARK.vec -bg bg.txt -numStages 12 -minHitRate 0.999 -maxFalseAlarmRate 0.2 -numPos 193 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 36 -h 24
+
+opencv_traincascade -data cascades/YFT -vec infoYFT.vec -bg bg.txt -numStages 25 -minHitRate 0.999 -maxFalseAlarmRate 0.2 -numPos 799 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 36 -h 24
 
 
