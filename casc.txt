@@ -1,0 +1,11 @@
+cd outputs
+
+find pos -name '*.jpg' -exec identify -format '%i 1 0 0 %w %h\n' \{\} \; > pos.txt
+
+find neg -name '*.jpg' > bg.txt
+
+opencv_createsamples -info pos.txt -bg bg.txt -vec info.vec -num 4305 -maxxangle 1 -maxyangle -maxzangle 1 -w 75 -h 50
+
+opencv_traincascade -data cascades -vec info.vec -bg bg.txt -numStages 15 -minHitRate 0.999 -maxFalseAlarmRate 0.5 -numPos 4000 -numNeg 446 -mode ALL -prevalvValBufSize 1596 -precalcIdxBufSize 1596 -featureType LBP -w 75 -h 50
+
+

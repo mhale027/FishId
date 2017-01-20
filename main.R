@@ -17,11 +17,63 @@ print(list.files(folder))
 tmp <- lapply(list.files(folder), function(x) list.files(paste0(folder, '/', x)))
 files <- data.frame(label = rep(list.files(folder), sapply(tmp, length)), image = unlist(tmp))
 fish.files <- filter(files, label != "NoF")
+markers <- read.csv("markers.csv")
 
 
 
+for (i in 1:nrow(markers)) {
+  fold <- files[files$image == as.character(markers$image[i]),]$label
+  img <- load.image(paste0("input/train/", fold, "/",markers$image[i]))
+  x.center <- (markers[i,2] + markers[i,4])/2
+  y.center <- (markers[i,3] + markers[i,5])/2
+  dx <- markers[i,2] - markers[i,4]
+  dy <- markers[i,3] - markers[i,5]
+  d <- max(abs(dx), abs(dy))/2
+  
+  img1 <- imsub(img, x > (x.center - d - 5) & x < (x.center + d + 5))
+  img1 <- imsub(img1, y > (y.center - d - 5) & y < (y.center + d + 5))
+  img1 <- resize(img1, dim(img1)[1], dim(img1)[2], 1, 1)
+  # mg1 <- imrotate(img1, -atan(dy/dx)*180/pi)
+  # if (dx > 0) { img1 <- mirror(img1, "x") }
+  # img2 <- imsub(img1, x > (dim(img1)[1]/10) & x < (dim(img1)[1]*9/10))
+  # img2 <- imsub(img2, y > (dim(img2)[2]/4) & y < (dim(img2)[2]*3/4))
+  save.image(img1, paste0("outputs/pos/", i, ".jpg"))
+}
 
+for (i in 1:length(list.files("input/train/NoF"))) {
+  img1 <- load.image(paste0("input/train/NoF/", list.files("input/train/NoF")[i]))
+  img2 <- resize(img1, dim(img1)[1], dim(img1)[2], 1, 1)
+  save.image(img2, paste0("outputs/neg/", i, ".jpg"))
+}
 
+fish <- list.files("input/train")[-c(grep("NoF", list.files("input/train")))]
+for (j in 1:length(fish)) {
+  path.i <- paste0("input/train/", fish[j], "/")
+  count <- 1
+  for (i in 1:length(list.files(path.i))) {
+    m <- markers[markers$image == as.character(files[files$label == fish[j],]$image[i]),]
+    for (k in 1:nrow(m)) {
+      if (nrow(m) == 0) {next} else {
+        img <- load.image(paste0(path.i, list.files(path.i)[i]))
+        img <- resize(img, dim(img)[1], dim(img)[2], 1, 1)
+        
+        x.center <- (m[k,2] + m[k,4])/2
+        y.center <- (m[k,3] + m[k,5])/2
+        dx <- m[k,2] - m[k,4]
+        dy <- m[k,3] - m[k,5]
+        d <- max(abs(dx), abs(dy))/2
+      
+        img <- imsub(img, x > (x.center - d - 5) & x < (x.center + d + 5))
+        img <- imsub(img, y > (y.center - d - 5) & y < (y.center + d + 5))
+      
+      
+      
+        save.image(img, paste0("outputs/pos", fish[j], "/", count, ".jpg"))
+        count <- count + 1
+      }
+    }
+  }
+}
 
 
 
